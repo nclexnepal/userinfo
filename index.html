@@ -1,45 +1,415 @@
-<button onclick="getLocation()">Get my location</button>
-<pre id="out"></pre>
-
-<script>
-async function getLocation() {
-  const out = document.getElementById('out');
-
-  const deviceInfo = {
-    userAgent: navigator.userAgent,
-    platform: navigator.platform,
-    language: navigator.language,
-    isMobile: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
-  };
-
-  if (!navigator.geolocation) {
-    out.textContent = "Geolocation not supported.";
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const { latitude, longitude, accuracy } = pos.coords;
-
-      const data = {
-        latitude,
-        longitude,
-        accuracy_m: accuracy,
-        device: deviceInfo
-      };
-
-      out.textContent = JSON.stringify(data, null, 2);
-
-      // send to backend
-      fetch('/api/location', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(data)
-      });
-    },
-    (err) => {
-      out.textContent = err.message;
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Get My Location</title>
+  <style>
+    :root{
+      --bg1:#0b1220;
+      --bg2:#0f1b33;
+      --card: rgba(255,255,255,.08);
+      --card2: rgba(255,255,255,.06);
+      --border: rgba(255,255,255,.14);
+      --text: rgba(255,255,255,.9);
+      --muted: rgba(255,255,255,.68);
+      --good:#22c55e;
+      --bad:#ef4444;
+      --accent:#60a5fa;
+      --accent2:#a78bfa;
+      --shadow: 0 20px 60px rgba(0,0,0,.45);
+      --radius: 18px;
     }
-  );
-}
-</script>
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+      background:
+        radial-gradient(1100px 600px at 20% 10%, rgba(96,165,250,.25), transparent 60%),
+        radial-gradient(900px 500px at 85% 25%, rgba(167,139,250,.22), transparent 55%),
+        radial-gradient(700px 500px at 40% 95%, rgba(34,197,94,.10), transparent 55%),
+        linear-gradient(160deg, var(--bg1), var(--bg2));
+      display:grid;
+      place-items:center;
+      padding:24px;
+    }
+
+    .wrap{
+      width:min(760px, 100%);
+    }
+
+    .card{
+      background: linear-gradient(180deg, var(--card), var(--card2));
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+
+    .card::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      background: linear-gradient(120deg, rgba(96,165,250,.35), rgba(167,139,250,.35), rgba(34,197,94,.25));
+      filter: blur(22px);
+      opacity:.35;
+      z-index:0;
+    }
+
+    header{
+      position:relative;
+      z-index:1;
+      padding:22px 22px 14px;
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      justify-content:space-between;
+    }
+
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    h1{
+      margin:0;
+      font-size:18px;
+      letter-spacing:.2px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+
+    .pill{
+      font-size:12px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      color:var(--muted);
+      background: rgba(255,255,255,.05);
+    }
+
+    .sub{
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.4;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+
+    button{
+      border:1px solid rgba(255,255,255,.18);
+      background: linear-gradient(180deg, rgba(96,165,250,.22), rgba(96,165,250,.12));
+      color:var(--text);
+      padding:10px 14px;
+      border-radius:12px;
+      font-weight:600;
+      cursor:pointer;
+      transition: transform .08s ease, filter .15s ease, border-color .15s ease;
+      display:inline-flex;
+      gap:10px;
+      align-items:center;
+      user-select:none;
+    }
+
+    button:hover{ filter: brightness(1.05); border-color: rgba(255,255,255,.28); }
+    button:active{ transform: translateY(1px); }
+    button:disabled{
+      cursor:not-allowed;
+      opacity:.55;
+      filter:saturate(.8);
+    }
+
+    .btn-secondary{
+      background: rgba(255,255,255,.06);
+    }
+
+    .grid{
+      position:relative;
+      z-index:1;
+      padding:0 22px 22px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:14px;
+    }
+
+    .status{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      border-radius:14px;
+      padding:12px 14px;
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.35;
+    }
+
+    .dot{
+      width:10px;
+      height:10px;
+      border-radius:999px;
+      margin-top:3px;
+      background: rgba(255,255,255,.25);
+      flex:0 0 auto;
+    }
+    .dot.good{ background: var(--good); }
+    .dot.bad{ background: var(--bad); }
+    .dot.wait{
+      background: conic-gradient(from 0deg, rgba(255,255,255,.15), rgba(255,255,255,.55), rgba(255,255,255,.15));
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin{ to { transform: rotate(360deg); } }
+
+    pre{
+      margin:0;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.30);
+      overflow:auto;
+      font-size:12.5px;
+      line-height:1.45;
+      color: rgba(255,255,255,.88);
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+
+    .row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      padding-top:2px;
+    }
+
+    .hint{
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+
+    .kbd{
+      font-size:11px;
+      padding:2px 8px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.75);
+    }
+
+    .toast{
+      display:none;
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      font-size:12.5px;
+    }
+    .toast.show{ display:block; }
+
+    .mono{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div class="title">
+          <h1>
+            📍 Location Capture
+            <span class="pill" id="permPill">permission: unknown</span>
+          </h1>
+          <p class="sub">
+            Click “Get my location” to request browser permission and capture coordinates + device info.
+            We’ll show it below and POST it to <span class="mono">/api/location</span>.
+          </p>
+        </div>
+
+        <div class="actions">
+          <button id="btn" onclick="getLocation()">
+            <span>Get my location</span>
+          </button>
+          <button class="btn-secondary" onclick="copyOutput()">
+            Copy JSON
+          </button>
+        </div>
+      </header>
+
+      <div class="grid">
+        <div class="row">
+          <div class="hint">
+            <span class="kbd">Tip</span>
+            For more accuracy, enable GPS and use HTTPS (required by most browsers).
+          </div>
+          <div class="hint mono" id="metaText"></div>
+        </div>
+
+        <div class="status" id="statusBox">
+          <span class="dot" id="statusDot"></span>
+          <div>
+            <div class="mono" id="statusText">Ready.</div>
+            <div id="statusSub">No data yet.</div>
+          </div>
+        </div>
+
+        <pre id="out" class="mono">{}</pre>
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const out = document.getElementById('out');
+    const btn = document.getElementById('btn');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const statusSub = document.getElementById('statusSub');
+    const permPill = document.getElementById('permPill');
+    const metaText = document.getElementById('metaText');
+    const toast = document.getElementById('toast');
+
+    function setStatus(type, title, sub) {
+      statusDot.className = 'dot' + (type ? ` ${type}` : '');
+      statusText.textContent = title || '';
+      statusSub.textContent = sub || '';
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.classList.remove('show'), 2400);
+    }
+
+    function deviceInfo() {
+      return {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        isMobile: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+    }
+
+    async function updatePermissionPill() {
+      // Not supported on all browsers
+      try {
+        if (!navigator.permissions) {
+          permPill.textContent = 'permission: (no API)';
+          return;
+        }
+        const p = await navigator.permissions.query({ name: 'geolocation' });
+        permPill.textContent = 'permission: ' + p.state;
+        p.onchange = () => (permPill.textContent = 'permission: ' + p.state);
+      } catch {
+        permPill.textContent = 'permission: unknown';
+      }
+    }
+
+    function formatMeta(coords) {
+      // quick friendly info line
+      const parts = [];
+      if (coords?.accuracy != null) parts.push(`±${Math.round(coords.accuracy)}m`);
+      parts.push(new Date().toLocaleString());
+      metaText.textContent = parts.join(' • ');
+    }
+
+    async function getLocation() {
+      btn.disabled = true;
+      setStatus('wait', 'Requesting location…', 'Please allow location access in your browser prompt.');
+
+      const info = deviceInfo();
+
+      if (!navigator.geolocation) {
+        setStatus('bad', 'Geolocation not supported.', 'Your browser does not support the Geolocation API.');
+        btn.disabled = false;
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+
+          const data = {
+            latitude,
+            longitude,
+            accuracy_m: accuracy,
+            capturedAt: new Date().toISOString(),
+            device: info,
+          };
+
+          formatMeta(pos.coords);
+          out.textContent = JSON.stringify(data, null, 2);
+          setStatus('good', 'Location captured.', 'Sending data to backend…');
+
+          try {
+            const res = await fetch('/api/location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data),
+            });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setStatus('good', 'Done!', 'Saved successfully on backend.');
+            showToast('Saved ✅');
+          } catch (e) {
+            setStatus('bad', 'Saved locally, but backend failed.', String(e?.message || e));
+            showToast('Backend error ❌');
+          } finally {
+            btn.disabled = false;
+          }
+        },
+        (err) => {
+          // Useful messages per error code
+          let msg = err.message || 'Failed to get location.';
+          if (err.code === 1) msg = 'Permission denied. Please allow location access.';
+          if (err.code === 2) msg = 'Position unavailable. Try turning on GPS or switching networks.';
+          if (err.code === 3) msg = 'Timed out. Try again or move to an open area.';
+
+          setStatus('bad', 'Could not capture location.', msg);
+          btn.disabled = false;
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 0,
+        }
+      );
+    }
+
+    async function copyOutput() {
+      try {
+        await navigator.clipboard.writeText(out.textContent);
+        showToast('Copied to clipboard 📋');
+      } catch {
+        showToast('Copy failed (clipboard blocked)');
+      }
+    }
+
+    // init
+    updatePermissionPill();
+    out.textContent = JSON.stringify({ note: "Click 'Get my location' to generate data." }, null, 2);
+  </script>
+</body>
+</html>
